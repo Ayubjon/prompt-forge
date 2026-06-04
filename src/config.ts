@@ -6,7 +6,7 @@ export interface ForgeConfig {
   model: string;
 }
 
-export function parseConfig(env: NodeJS.ProcessEnv): ForgeConfig {
+export function parseConfig(env: Record<string, string | undefined>): ForgeConfig {
   const apiKey = env.PROMPTFORGE_API_KEY || env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('missing API key — set PROMPTFORGE_API_KEY (or OPENAI_API_KEY)');
