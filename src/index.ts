@@ -1,37 +1,19 @@
 #!/usr/bin/env node
-// prompt-forge MCP server: registers the enhance/critique tools over stdio.
+// prompt-forge MCP server: returns expert prompt-engineering guidance that the
+// HOST model (Claude Desktop, Cursor, ...) uses to rewrite or critique a prompt.
+// No API key and no external LLM — it uses the model you already have.
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { parseConfig } from './config.js';
-import { createLLM, type LLM } from './llm.js';
-import { runEnhance } from './enhance.js';
-import { runCritique } from './critique.js';
+import { buildEnhanceInstruction } from './enhance.js';
+import { buildCritiqueInstruction } from './critique.js';
 
 const targetSchema = z
   .enum(['general', 'coding', 'image', 'writing', 'research'])
   .default('general');
 
-// Lazily build the LLM from env; returns an error message if not configured.
-function getLLM(): { llm: LLM } | { error: string } {
-  try {
-    return { llm: createLLM(parseConfig(process.env)) };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-function setupHelp(reason: string): string {
-  return (
-    `prompt-forge is not configured: ${reason}.\n\n` +
-    'Set PROMPTFORGE_API_KEY (or OPENAI_API_KEY) in your MCP host config. ' +
-    'Optional: PROMPTFORGE_BASE_URL (default https://api.openai.com/v1), ' +
-    'PROMPTFORGE_MODEL (default gpt-4o-mini).'
-  );
-}
-
-const server = new McpServer({ name: 'prompt-forge', version: '0.1.0' });
+const server = new McpServer({ name: 'prompt-forge', version: '0.2.0' });
 
 server.tool(
   'enhance_prompt',
@@ -41,19 +23,9 @@ server.tool(
     target: targetSchema.describe('Task type the prompt is for'),
     context: z.string().optional().describe('Optional extra context'),
   },
-  async ({ draft, target, context }) => {
-    const got = getLLM();
-    if ('error' in got) {
-      return { content: [{ type: 'text' as const, text: setupHelp(got.error) }], isError: true };
-    }
-    try {
-      const text = await runEnhance(got.llm, { draft, target, context });
-      return { content: [{ type: 'text' as const, text }] };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { content: [{ type: 'text' as const, text: `LLM request failed: ${msg}` }], isError: true };
-    }
-  }
+  async ({ draft, target, context }) => ({
+    content: [{ type: 'text' as const, text: buildEnhanceInstruction(draft, target, context) }],
+  })
 );
 
 server.tool(
@@ -63,19 +35,9 @@ server.tool(
     draft: z.string().min(1).describe('The prompt to critique'),
     target: targetSchema.describe('Task type the prompt is for'),
   },
-  async ({ draft, target }) => {
-    const got = getLLM();
-    if ('error' in got) {
-      return { content: [{ type: 'text' as const, text: setupHelp(got.error) }], isError: true };
-    }
-    try {
-      const text = await runCritique(got.llm, { draft, target });
-      return { content: [{ type: 'text' as const, text }] };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { content: [{ type: 'text' as const, text: `LLM request failed: ${msg}` }], isError: true };
-    }
-  }
+  async ({ draft, target }) => ({
+    content: [{ type: 'text' as const, text: buildCritiqueInstruction(draft, target) }],
+  })
 );
 
 const transport = new StdioServerTransport();
