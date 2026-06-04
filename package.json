@@ -1,6 +1,6 @@
 {
   "name": "prompt-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server that forges rough prompts into expert, task-tailored prompts",
   "main": "index.js",
   "directories": {
@@ -18,7 +18,6 @@
   "type": "module",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "openai": "^6.42.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
